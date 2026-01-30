@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "llamaindex-anakin"
 version = "0.1.0"
 description = "LlamaIndex integration for Anakin API - web scraping, AI search, and intelligent data extraction workflows"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
