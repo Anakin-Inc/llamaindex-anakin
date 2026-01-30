@@ -1,6 +1,5 @@
 """Anakin AI search workflow for LlamaIndex."""
 
-import os
 from workflows import Workflow, step, Context
 from workflows.events import StartEvent, StopEvent, Event
 from pydantic import Field
@@ -11,6 +10,7 @@ from llamaindex_anakin.client import AnakinAPIClient
 class SearchStartEvent(StartEvent):
     """Start event for search workflow."""
 
+    api_key: str = Field(description="Anakin API key")
     query: str = Field(description="The search query or question")
     max_results: int = Field(default=5, description="Maximum number of results")
 
@@ -22,14 +22,10 @@ class SearchProgressEvent(Event):
 
 
 class AnakinSearchWorkflow(Workflow):
-    """Workflow for AI-powered searches using the Anakin API."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        api_key = os.getenv("ANAKIN_API_KEY")
-        if not api_key:
-            raise ValueError("ANAKIN_API_KEY environment variable is required")
-        self.client = AnakinAPIClient(api_key=api_key)
+    """Workflow for AI-powered searches using the Anakin API.
+    
+    Users must provide their own Anakin API key in the request.
+    """
 
     @step
     async def search(self, event: SearchStartEvent, context: Context) -> StopEvent:
@@ -47,7 +43,10 @@ class AnakinSearchWorkflow(Workflow):
         )
 
         try:
-            result = self.client.search(prompt=event.query, limit=event.max_results)
+            # Create client with user's API key
+            client = AnakinAPIClient(api_key=event.api_key)
+            
+            result = client.search(prompt=event.query, limit=event.max_results)
 
             context.write_event_to_stream(
                 SearchProgressEvent(message="Search completed successfully")

@@ -1,6 +1,5 @@
 """Anakin URL scraping workflow for LlamaIndex."""
 
-import os
 from workflows import Workflow, step, Context
 from workflows.events import StartEvent, StopEvent, Event
 from pydantic import Field
@@ -11,6 +10,7 @@ from llamaindex_anakin.client import AnakinAPIClient
 class ScrapeStartEvent(StartEvent):
     """Start event for scraping workflow."""
 
+    api_key: str = Field(description="Anakin API key")
     url: str = Field(description="The URL to scrape")
     country: str = Field(default="us", description="Country code for proxy routing")
     force_fresh: bool = Field(default=False, description="Whether to bypass cache")
@@ -25,14 +25,10 @@ class ScrapeProgressEvent(Event):
 
 
 class AnakinScrapeWorkflow(Workflow):
-    """Workflow for scraping websites using the Anakin API."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        api_key = os.getenv("ANAKIN_API_KEY")
-        if not api_key:
-            raise ValueError("ANAKIN_API_KEY environment variable is required")
-        self.client = AnakinAPIClient(api_key=api_key)
+    """Workflow for scraping websites using the Anakin API.
+    
+    Users must provide their own Anakin API key in the request.
+    """
 
     @step
     async def scrape(self, event: ScrapeStartEvent, context: Context) -> StopEvent:
@@ -50,7 +46,10 @@ class AnakinScrapeWorkflow(Workflow):
         )
 
         try:
-            result = self.client.scrape_url(
+            # Create client with user's API key
+            client = AnakinAPIClient(api_key=event.api_key)
+            
+            result = client.scrape_url(
                 url=event.url,
                 country=event.country,
                 force_fresh=event.force_fresh,

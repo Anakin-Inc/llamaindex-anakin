@@ -1,6 +1,5 @@
 """Anakin agentic search workflow for LlamaIndex."""
 
-import os
 from workflows import Workflow, step, Context
 from workflows.events import StartEvent, StopEvent, Event
 from pydantic import Field
@@ -11,6 +10,7 @@ from llamaindex_anakin.client import AnakinAPIClient
 class AgenticSearchStartEvent(StartEvent):
     """Start event for agentic search workflow."""
 
+    api_key: str = Field(description="Anakin API key")
     prompt: str = Field(description="The research prompt or question")
     use_browser: bool = Field(
         default=True, description="Whether to use browser for scraping"
@@ -30,14 +30,10 @@ class AgenticSearchProgressEvent(Event):
 
 
 class AnakinAgenticSearchWorkflow(Workflow):
-    """Workflow for advanced agentic searches using the Anakin API."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        api_key = os.getenv("ANAKIN_API_KEY")
-        if not api_key:
-            raise ValueError("ANAKIN_API_KEY environment variable is required")
-        self.client = AnakinAPIClient(api_key=api_key)
+    """Workflow for advanced agentic searches using the Anakin API.
+    
+    Users must provide their own Anakin API key in the request.
+    """
 
     @step
     async def agentic_search(
@@ -59,7 +55,10 @@ class AnakinAgenticSearchWorkflow(Workflow):
         )
 
         try:
-            result = self.client.agentic_search(
+            # Create client with user's API key
+            client = AnakinAPIClient(api_key=event.api_key)
+            
+            result = client.agentic_search(
                 prompt=event.prompt,
                 use_browser=event.use_browser,
                 max_wait_time=event.max_wait_time,
