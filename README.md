@@ -1,8 +1,78 @@
-# llamaindex-anakin
+# Anakin for LlamaIndex
 
-LlamaIndex integration for [Anakin AI](https://anakin.io) - powerful web scraping, AI-powered search, and intelligent data extraction tools and workflows for your LlamaIndex applications.
+[Anakin](https://anakin.io) web data for LlamaIndex agents and RAG pipelines:
+scrape, search, map and crawl the web, run deep research, use Wire actions on
+hundreds of sites, monitor pages for changes and drive a cloud browser.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+| Package | Install | Use it for |
+|---|---|---|
+| [`llama-index-tools-anakin`](llama-index-tools-anakin/) | `pip install llama-index-tools-anakin` | Agents. `AnakinToolSpec` has all 22 tools of Anakin's MCP server. |
+| [`llama-index-readers-anakin`](llama-index-readers-anakin/) | `pip install llama-index-readers-anakin` | RAG. `AnakinWebReader` loads pages, crawls, search results and site maps as Documents. |
+
+Both use the official [`anakin-sdk`](https://pypi.org/project/anakin-sdk/)
+client and need an Anakin API key, free at https://anakin.io/dashboard:
+
+```bash
+export ANAKIN_API_KEY=...
+```
+
+## Agents
+
+```python
+import asyncio
+
+from llama_index.core.agent.workflow import FunctionAgent
+from llama_index.llms.anthropic import Anthropic
+from llama_index.tools.anakin import AnakinToolSpec
+
+agent = FunctionAgent(
+    tools=AnakinToolSpec().to_tool_list(),
+    llm=Anthropic(model="claude-opus-5-5"),
+)
+
+
+async def main() -> None:
+    print(await agent.run("What do the top three CRM vendors charge per seat?"))
+
+
+asyncio.run(main())
+```
+
+## RAG
+
+```python
+from llama_index.core import VectorStoreIndex
+from llama_index.readers.anakin import AnakinWebReader
+
+reader = AnakinWebReader(mode="crawl", params={"max_pages": 50})
+index = VectorStoreIndex.from_documents(reader.load_data(url="https://anakin.io/docs"))
+```
+
+See each package's README for its options.
+
+## Development and releases
+
+Each package has its own environment:
+
+```bash
+cd llama-index-tools-anakin   # or llama-index-readers-anakin
+uv sync
+uv run pytest
+```
+
+CI tests both packages on Python 3.10 to 3.14, and on the oldest versions
+their dependency ranges allow. To release one, update `version` in its
+`pyproject.toml` and its `CHANGELOG.md`, then push a tag: `tools-v<version>`
+or `readers-v<version>`. The publish workflow checks the tag against the
+version and uploads to PyPI with trusted publishing.
+
+# LlamaCloud workflow app (`llamaindex-anakin`)
+
+The `src/llamaindex_anakin` app has three Anakin tools (scrape, search and
+agentic search) and serves them as workflows with `llamactl`, locally or on
+LlamaCloud. For agents and RAG pipelines, use the packages above.
 
 ## Features
 
@@ -23,11 +93,7 @@ LlamaIndex integration for [Anakin AI](https://anakin.io) - powerful web scrapin
 
 ## Installation
 
-```bash
-pip install llamaindex-anakin
-```
-
-Or install from source:
+The app isn't published to PyPI. Install it from source:
 
 ```bash
 git clone https://github.com/Anakin-Inc/llamaindex-anakin.git
