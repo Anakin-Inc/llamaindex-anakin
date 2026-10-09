@@ -66,6 +66,10 @@ test = "pytest"
 all-check = ["format-check", "lint-check", "test"]
 all-fix = ["format", "lint", "test"]
 
+[tool.pytest.ini_options]
+# The llama-index-*-anakin packages have their own environments and tests.
+testpaths = ["tests"]
+
 [tool.llamadeploy]
 env_files = [".env"]
 
