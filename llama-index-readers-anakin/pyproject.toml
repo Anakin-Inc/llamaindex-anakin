@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llama-index-readers-anakin"
+version = "0.1.0"
+description = "LlamaIndex reader for Anakin: load web pages, crawls, search results and site maps as Documents"
+authors = [{name = "Anakin", email = "support@anakin.io"}]
+requires-python = ">=3.10,<4.0"
+readme = "README.md"
+license = "MIT"
+keywords = ["llama-index", "anakin", "web scraping", "reader", "rag", "crawl"]
+dependencies = [
+    "anakin-sdk>=0.2.0,<0.3",
+    "llama-index-core>=0.13.0,<0.15",
+]
+
+[project.urls]
+Homepage = "https://anakin.io"
+Documentation = "https://anakin.io/docs"
+Repository = "https://github.com/Anakin-Inc/llamaindex-anakin"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.11",
+    "mypy>=1.10",
+]
+
+[tool.hatch.build.targets.sdist]
+include = ["llama_index/"]
+
+[tool.hatch.build.targets.wheel]
+include = ["llama_index/"]
+
+[tool.llamahub]
+contains_example = false
+import_path = "llama_index.readers.anakin"
+
+[tool.llamahub.class_authors]
+AnakinWebReader = "Anakin-Inc"
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+ignore_missing_imports = true
+explicit_package_bases = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.isort]
+known-third-party = ["anakin"]

@@ -23,6 +23,7 @@ MANIFEST
 
 # Virtual environments
 .venv/
+.venv-*/
 venv/
 ENV/
 env/
@@ -43,6 +44,9 @@ env/
 workflows.db
 uv.lock
 .llamactl/
+# The packages keep their lockfiles: CI installs them with `uv sync --locked`.
+!/llama-index-tools-anakin/uv.lock
+!/llama-index-readers-anakin/uv.lock
 
 # Node.js (if using UI)
 node_modules/
@@ -59,6 +63,8 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .tox/
 
 # Logs

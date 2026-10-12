@@ -1,0 +1,120 @@
+name: Publish to PyPI
+
+# Release a package by pushing a tag for it:
+#   tools-v0.1.0    -> llama-index-tools-anakin 0.1.0
+#   readers-v0.1.0  -> llama-index-readers-anakin 0.1.0
+# The tag's version must match the package's pyproject.toml.
+#
+# Publishing uses PyPI trusted publishing: each project needs a trusted
+# publisher for this repository, workflow publish.yml and environment "pypi"
+# (and "testpypi" on TestPyPI).
+
+on:
+  push:
+    tags:
+      - "tools-v[0-9]+.[0-9]+.[0-9]+*"
+      - "readers-v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        type: choice
+        options:
+          - llama-index-tools-anakin
+          - llama-index-readers-anakin
+      target:
+        description: Where to publish
+        required: true
+        type: choice
+        default: testpypi
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      package: ${{ steps.pick.outputs.package }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.13"
+      - name: Pick the package and check its version
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PACKAGE: ${{ inputs.package }}
+        run: |
+          case "$EVENT:$REF_NAME" in
+            push:tools-v*)   package=llama-index-tools-anakin;   tag_version="${REF_NAME#tools-v}" ;;
+            push:readers-v*) package=llama-index-readers-anakin; tag_version="${REF_NAME#readers-v}" ;;
+            workflow_dispatch:*) package="$INPUT_PACKAGE"; tag_version="" ;;
+            *) echo "Unexpected trigger $EVENT $REF_NAME" >&2; exit 1 ;;
+          esac
+          version=$(cd "$package" && uv version --short)
+          if [ -n "$tag_version" ] && [ "$tag_version" != "$version" ]; then
+            echo "Tag $REF_NAME doesn't match $package version $version" >&2
+            exit 1
+          fi
+          echo "Publishing $package $version"
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+      - name: Test
+        working-directory: ${{ steps.pick.outputs.package }}
+        run: |
+          uv sync --locked
+          uv run pytest -W error::UserWarning
+      - name: Build
+        run: uv build --out-dir dist "${{ steps.pick.outputs.package }}"
+      - name: Check metadata
+        run: uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/${{ needs.build.outputs.package }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    if: github.event_name == 'push' || inputs.target == 'pypi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ needs.build.outputs.package }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

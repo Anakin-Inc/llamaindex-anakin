@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.package }} (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [llama-index-tools-anakin, llama-index-readers-anakin]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+          cache-dependency-glob: ${{ matrix.package }}/uv.lock
+      - name: Install
+        run: uv sync --locked
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Type check
+        run: uv run mypy llama_index
+      - name: Test
+        run: uv run pytest -W error::UserWarning
+
+  lowest:
+    # The oldest versions the dependency ranges allow, on the oldest Python.
+    # llama-index-core 0.13 itself warns under newer pydantic, so warnings
+    # aren't errors here.
+    name: ${{ matrix.package }} (lowest dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [llama-index-tools-anakin, llama-index-readers-anakin]
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.10"
+      - name: Install
+        run: |
+          uv venv .venv-lowest
+          uv pip install --python .venv-lowest --resolution lowest-direct -e . "pytest>=8"
+      - name: Test
+        run: .venv-lowest/bin/python -m pytest
+
+  build:
+    name: Build and install together
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.13"
+      - name: Build
+        run: |
+          uv build --out-dir dist llama-index-tools-anakin
+          uv build --out-dir dist llama-index-readers-anakin
+      - name: Check metadata
+        run: uvx twine check --strict dist/*
+      - name: Install both wheels side by side
+        # Both packages add to the llama_index namespace next to llama-index-core.
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke dist/*.whl
+          /tmp/smoke/bin/python -c "
+          from llama_index.readers.anakin import AnakinWebReader
+          from llama_index.tools.anakin import AnakinToolSpec
+          assert len(AnakinToolSpec.spec_functions) == 22
+          assert AnakinWebReader.class_name() == 'AnakinWebReader'
+          "
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
